@@ -1,0 +1,7 @@
+server:
+  port: 8090
+rtsp:
+  port: 8890
+  video-path:
+pool:
+  corePoolSize:
