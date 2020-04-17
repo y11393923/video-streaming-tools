@@ -4,7 +4,7 @@ package com.sensetime.tsc.streaming.enums;
  * @Author: zhouyuyang
  * @Date: 2020/4/14 17:49
  */
-public enum CommonCodeEnum {
+public enum CommonCodeEnum implements BaseEnumI{
 
     SUCCESS("0","成功"),
     SYSTEM_FAILED("10","服务器开小差"),
@@ -14,6 +14,9 @@ public enum CommonCodeEnum {
     PARAMETER_VALIDATE_FAILED("100001","参数错误"),
     VIDEO_PATH_ERROR("100002", "视频地址错误"),
     NO_STREAMING_VIDEO("100003", "没有转流的视频"),
+    UPLOAD_FILE_CANNOT_BE_EMPTY("100004", "上传文件不能为空"),
+    UPLOAD_FILE_TYPE_CANNOT_BE_EMPTY("100005", "上传文件类型不能为空"),
+    UPLOAD_FILE_FORMAT_ERROR("100006", "上传文件格式错误"),
     ;
 
 
@@ -26,10 +29,12 @@ public enum CommonCodeEnum {
 
     String value;
 
+    @Override
     public String getCode() {
         return code;
     }
 
+    @Override
     public String getValue() {
         return value;
     }

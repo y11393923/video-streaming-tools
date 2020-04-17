@@ -1,7 +1,7 @@
 package com.sensetime.tsc.streaming.constant;
 
-import static com.sensetime.tsc.streaming.constant.SysyemConstant.FILE_SEPARATOR;
-import static com.sensetime.tsc.streaming.constant.SysyemConstant.USER_DIR;
+import static com.sensetime.tsc.streaming.constant.CommonConstant.FILE_SEPARATOR;
+import static com.sensetime.tsc.streaming.constant.CommonConstant.USER_DIR;
 
 /**
  * @Author: zhouyuyang
@@ -17,6 +17,10 @@ public class CommandConstant {
 
     public static final String RTSP_SERVER_PATH = USER_DIR + FILE_SEPARATOR + RTSP_SERVER_NAME;
 
+    private static final String FFMPEG_NAME = "ffmpeg";
+
+    public static final String FFMPEG_PATH = USER_DIR + FILE_SEPARATOR + FFMPEG_NAME;
+
     public static final String VIDEO_PATH = USER_DIR + FILE_SEPARATOR + "video" + FILE_SEPARATOR;
 
     public static final String SUFFIX_MP4_VIDEO = "*.mp4";
@@ -27,7 +31,7 @@ public class CommandConstant {
 
     public static final String KILL_PROCESS_COMMAND = "kill -9 %d";
 
-    public static final String FORMAT_CONVERSION_COMMAND = "ffmpeg -i %s %s";
+    public static final String FORMAT_CONVERSION_COMMAND = "%s -i %s %s";
 
     public static final String FILTER_OUT_NOT_MP4_CMD = "ls %s | grep -v '%s'";
 

@@ -2,6 +2,10 @@ package com.sensetime.tsc.streaming.controller;
 
 import com.sensetime.tsc.streaming.response.BaseResult;
 import com.sensetime.tsc.streaming.service.RtspServerService;
+import com.sensetime.tsc.streaming.service.impl.RtspServerServiceImpl;
+import com.sensetime.tsc.streaming.utils.BaseResultUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -13,13 +17,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/rtsp-server")
 public class RtspServerController {
+    private static final Logger logger = LoggerFactory.getLogger(RtspServerController.class);
 
     @Autowired
     private RtspServerService rtspServerService;
 
     @RequestMapping(value = "/video-streaming", method = RequestMethod.GET)
     public BaseResult diversion(){
-        return rtspServerService.videoStreaming();
+        try {
+            return BaseResultUtil.buildBaseResult(rtspServerService.videoStreaming());
+        } catch (Exception e) {
+            logger.error("video streaming execution failed ", e);
+            return BaseResultUtil.buildBaseResult(e.getMessage());
+        }
+    }
+
+    @RequestMapping(value = "/video-streaming", method = RequestMethod.POST)
+    public BaseResult videoFormatConversion(String convertVideoPath, String conversionFormat){
+        try {
+            return BaseResultUtil.buildBaseResult(rtspServerService.videoFormatConversion(convertVideoPath, conversionFormat));
+        } catch (Exception e) {
+            logger.error("video format conversion execution failed ", e);
+            return BaseResultUtil.buildBaseResult(e.getMessage());
+        }
     }
 
 }
