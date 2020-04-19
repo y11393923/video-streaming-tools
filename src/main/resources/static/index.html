@@ -30,14 +30,17 @@
     <p>单视频上传支持格式：mp4、avi、mov、wmv、flv、asx、asf、mpg、3gp</p>
     <p>支持zip压缩包格式上传</p>
     <div>
-        <form method="POST" enctype="multipart/form-data" action="/video/upload">
+        <form>
             <p>
-                文件：<input type="file" name="file"/>
-                <input type="submit" value="上传"/>
+                文件：<input type="file" class="file"/>
+                <input type="button" class="upload" value="上传"/>
             </p>
             <p>
                 <input type="button" class="clearAllVideos" value="清除所有上传视频"/>
             </p>
+            <div class="result">
+
+            </div>
         </form>
     </div>
 
@@ -75,6 +78,47 @@
                             $(".message").show();
                         } else{
                             alert("转流失败:" + data.errorMsg);
+                        }
+                    }
+                })
+            })
+            $(".upload").click(function () {
+                $(".result").html("");
+                var file = $(".file").val();
+                if (file === ""){
+                    alert("请选择上传的文件");
+                    return false;
+                }
+                let fileName = file.substring(file.lastIndexOf(".") + 1).toLowerCase();
+                let type = 1;
+                if(fileName === "zip"){
+                    type = 2;
+                }
+                var formData = new FormData();
+                formData.append("file", $(".file")[0].files[0]);
+                formData.append("type", type);
+                $.ajax({
+                    url: "/video/upload",
+                    type: "POST",
+                    dataType: "json",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (data) {
+                        if(data.errorCode === "0"){
+                            let data = data.data;
+                            var success = "<p>成功上传" + data.success + "个视频</p>";
+                            $(".result").append(success);
+                            if (data.failed !== 0){
+                                var failed = "<dl><dt>上传失败" + data.failed + "个视频</dt>";
+                                $.each(data.failedVos, function (i, obj) {
+                                    failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
+                                })
+                                failed +="</dl>";
+                                $(".result").append(failed);
+                            }
+                        }else{
+                            alert("上传失败:" + data.errorMsg)
                         }
                     }
                 })
