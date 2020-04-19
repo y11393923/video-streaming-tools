@@ -17,6 +17,12 @@ public enum CommonCodeEnum implements BaseEnumI{
     UPLOAD_FILE_CANNOT_BE_EMPTY("100004", "上传文件不能为空"),
     UPLOAD_FILE_TYPE_CANNOT_BE_EMPTY("100005", "上传文件类型不能为空"),
     UPLOAD_FILE_FORMAT_ERROR("100006", "上传文件格式错误"),
+    VIDEO_STORAGE_PATH_CREATE_FAILED("100007", "视频存放路径创建失败"),
+    NO_VIDEO_IN_COMPRESSED_PACKAGE("100008", "压缩包中没有视频"),
+    UNSUPPORTED_FORMAT("100009", "不支持的格式"),
+    VIDEO_FORMAT_CONVERSION_ERROR("100010", "视频格式转换错误"),
+    VIDEO_ALREADY_EXISTS("100011", "视频已存在"),
+    UPLOAD_FILE_TYPE_ERROR("100012", "上传文件类型错误"),
     ;
 
 

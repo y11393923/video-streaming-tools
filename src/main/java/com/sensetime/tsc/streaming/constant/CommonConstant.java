@@ -29,6 +29,10 @@ public class CommonConstant {
 
     public static final String SUFFIX_ZIP = "zip";
 
+    public static final String ZIP_ENCODING = "GBK";
+
+    public static final Integer BUFFER_SIZE = 1024;
+
     /**
      * 初始化ffmpeg支持的视频格式
      */

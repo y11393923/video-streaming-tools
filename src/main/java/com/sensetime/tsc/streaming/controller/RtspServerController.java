@@ -22,22 +22,12 @@ public class RtspServerController {
     @Autowired
     private RtspServerService rtspServerService;
 
-    @RequestMapping(value = "/video-streaming", method = RequestMethod.GET)
+    @RequestMapping(value = "/diversion", method = RequestMethod.GET)
     public BaseResult diversion(){
         try {
             return BaseResultUtil.buildBaseResult(rtspServerService.videoStreaming());
         } catch (Exception e) {
             logger.error("video streaming execution failed ", e);
-            return BaseResultUtil.buildBaseResult(e.getMessage());
-        }
-    }
-
-    @RequestMapping(value = "/video-streaming", method = RequestMethod.POST)
-    public BaseResult videoFormatConversion(String convertVideoPath, String conversionFormat){
-        try {
-            return BaseResultUtil.buildBaseResult(rtspServerService.videoFormatConversion(convertVideoPath, conversionFormat));
-        } catch (Exception e) {
-            logger.error("video format conversion execution failed ", e);
             return BaseResultUtil.buildBaseResult(e.getMessage());
         }
     }

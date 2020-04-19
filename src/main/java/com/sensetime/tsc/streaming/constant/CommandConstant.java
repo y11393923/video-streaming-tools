@@ -43,4 +43,8 @@ public class CommandConstant {
 
     public static final Integer FILE_PERMISSIONS = 777;
 
+    public static final String MV_COMMAND = "mv %s %s";
+
+    public static final String RM_COMMAND = "rm -rf %s";
+
 }
