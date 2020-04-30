@@ -23,6 +23,7 @@ public enum CommonCodeEnum implements BaseEnumI{
     VIDEO_FORMAT_CONVERSION_ERROR("100010", "视频格式转换错误"),
     VIDEO_ALREADY_EXISTS("100011", "视频已存在"),
     UPLOAD_FILE_TYPE_ERROR("100012", "上传文件类型错误"),
+    VIDEO_NAME_CANNOT_CONTAIN_CHINESE("100013", "视频名称不能包含中文"),
     ;
 
 

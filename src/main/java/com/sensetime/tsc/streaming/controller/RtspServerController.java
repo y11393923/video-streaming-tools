@@ -2,7 +2,6 @@ package com.sensetime.tsc.streaming.controller;
 
 import com.sensetime.tsc.streaming.response.BaseResult;
 import com.sensetime.tsc.streaming.service.RtspServerService;
-import com.sensetime.tsc.streaming.service.impl.RtspServerServiceImpl;
 import com.sensetime.tsc.streaming.utils.BaseResultUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

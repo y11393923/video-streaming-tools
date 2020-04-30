@@ -5,7 +5,9 @@ import com.sensetime.tsc.streaming.enums.CommonCodeEnum;
 import com.sensetime.tsc.streaming.response.VideoStreamInfo;
 import com.sensetime.tsc.streaming.response.VideoUploadVo;
 import com.sensetime.tsc.streaming.service.VideoService;
+import com.sensetime.tsc.streaming.utils.CheckChineseUtil;
 import com.sensetime.tsc.streaming.utils.ShellUtil;
+import com.sensetime.tsc.streaming.utils.VideoUploadVoUtil;
 import com.sensetime.tsc.streaming.utils.ZipUtil;
 import org.apache.tools.zip.ZipEntry;
 import org.apache.tools.zip.ZipFile;
@@ -27,9 +29,7 @@ import java.util.stream.Collectors;
 
 import static com.sensetime.tsc.streaming.constant.CommandConstant.*;
 import static com.sensetime.tsc.streaming.constant.CommonConstant.*;
-import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.UNSUPPORTED_FORMAT;
-import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.VIDEO_ALREADY_EXISTS;
-import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.VIDEO_FORMAT_CONVERSION_ERROR;
+import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.*;
 
 
 /**
@@ -48,6 +48,13 @@ public class VideoServiceImpl implements VideoService {
 
     @PostConstruct
     private void init(){
+        if (StringUtils.isEmpty(rtspVideoPath)){
+            rtspVideoPath = VIDEO_PATH;
+        }else{
+            if (!rtspVideoPath.endsWith(FILE_SEPARATOR)){
+                rtspVideoPath += FILE_SEPARATOR;
+            }
+        }
         //初始化线程池
         int coreThreadPoolSize = StringUtils.isEmpty(corePoolSize) ? Runtime.getRuntime().availableProcessors() : Integer.parseInt(corePoolSize);
         threadPoolExecutor = new ThreadPoolExecutor(coreThreadPoolSize, coreThreadPoolSize, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), new DefaultThreadFactory("exec-command"));
@@ -56,7 +63,7 @@ public class VideoServiceImpl implements VideoService {
     @Override
     public VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file) throws Exception {
         checkParam(type, file);
-        String videoStoragePath = StringUtils.isEmpty(rtspVideoPath) ? VIDEO_PATH : rtspVideoPath;
+        String videoStoragePath = rtspVideoPath;
         //检查视频上传路径，不存在则创建
         File videoFile = new File(videoStoragePath);
         if (!videoFile.exists() || !videoFile.isDirectory()){
@@ -69,17 +76,15 @@ public class VideoServiceImpl implements VideoService {
         //单视频上传处理
         if (VIDEO_UPLOAD_TYPE_ONE.equals(type)){
             String newFileName = videoStoragePath + fileName;
+            //判断名称是否有中文
+            if (CheckChineseUtil.isContainChinese(fileName)){
+                return VideoUploadVoUtil.buildSingleError(fileName, VIDEO_NAME_CANNOT_CONTAIN_CHINESE.getValue());
+            }
             //判断视频名称是否存在 存在则重新封装名称
             newFile = new File(newFileName);
             if (newFile.exists() && !newFile.isDirectory()){
                 if (!cover){
-                    return VideoUploadVo.builder()
-                            .failedVos(Collections.singletonList(
-                                    VideoUploadVo.UploadFailedVo.builder()
-                                            .videoName(fileName)
-                                            .message(VIDEO_ALREADY_EXISTS.getValue())
-                                            .build()))
-                            .build();
+                    return VideoUploadVoUtil.buildSingleError(fileName, VIDEO_ALREADY_EXISTS.getValue());
                 }
                 //如果删除失败则用命令删除
                 if (!newFile.delete()){
@@ -87,6 +92,9 @@ public class VideoServiceImpl implements VideoService {
                 }
             }
             file.transferTo(newFile);
+            return VideoUploadVo.builder()
+                    .success(1)
+                    .build();
         }else if (VIDEO_UPLOAD_TYPE_TWO.equals(type)){
             String zipUploadPathName = UUID.randomUUID().toString();
             String zipUploadPath = videoStoragePath + zipUploadPathName + FILE_SEPARATOR;
@@ -112,23 +120,22 @@ public class VideoServiceImpl implements VideoService {
                     if (entry.isDirectory() || fileName.indexOf(SYMBOL_POINT) <= 0){
                         continue;
                     }
+                    //不能包含中文
+                    if (CheckChineseUtil.isContainChinese(fileName)){
+                        failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_NAME_CANNOT_CONTAIN_CHINESE.getValue()));
+                        continue;
+                    }
                     //判断视频文件是否支持
-                    String videoFileSuffix = fileName.substring(fileName.lastIndexOf(SYMBOL_POINT));
+                    String videoFileSuffix = fileName.substring(fileName.lastIndexOf(SYMBOL_POINT) + 1);
                     if (!VIDEO_SUFFIX_FORMAT.contains(videoFileSuffix)){
-                        failedVos.add(VideoUploadVo.UploadFailedVo.builder()
-                                .videoName(fileName)
-                                .message(UNSUPPORTED_FORMAT.getValue())
-                                .build());
+                        failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, UNSUPPORTED_FORMAT.getValue()));
                         continue;
                     }
                     String newFilePath = rtspVideoPath + entry.getName();
                     File temp = new File(newFilePath);
                     if (temp.exists() && !temp.isDirectory()){
                         if (!cover){
-                            failedVos.add(VideoUploadVo.UploadFailedVo.builder()
-                                    .videoName(fileName)
-                                    .message(VIDEO_ALREADY_EXISTS.getValue())
-                                    .build());
+                            failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_ALREADY_EXISTS.getValue()));
                             continue;
                         }
                         //如果删除失败则用命令删除
@@ -303,7 +310,7 @@ public class VideoServiceImpl implements VideoService {
 
     @Override
     public void clearAllVideos() throws IOException {
-        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, rtspVideoPath));
+        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, rtspVideoPath + SYMBOL_ASTERISK));
     }
 
 

@@ -15,6 +15,8 @@ public class CommonConstant {
 
     public static final String SYMBOL_POINT = ".";
 
+    public static final String SYMBOL_ASTERISK = "*";
+
     public static final String SYMBOL_BAR = "-";
 
     public static final String RTSP_ADDRESS = "rtsp://%s:%s/%s";

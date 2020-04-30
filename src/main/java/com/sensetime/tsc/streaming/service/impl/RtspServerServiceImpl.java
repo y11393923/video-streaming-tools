@@ -92,7 +92,6 @@ public class RtspServerServiceImpl implements RtspServerService {
     @Override
     public VideoStreamingVo videoStreaming() throws Exception {
         long start = System.currentTimeMillis();
-        VideoStreamingVo videoStreamingVo;
         //视频格式转换
         List<VideoStreamInfo> videoStreamInfos = videoService.videoFormatConversion(rtspVideoPath, SUFFIX_MP4);
         //判断该rtsp-server端口进程是否在运行
@@ -104,33 +103,28 @@ public class RtspServerServiceImpl implements RtspServerService {
         }
         //转流
         ShellUtil.exec(SH_COMMAND, String.format(START_RTSP_SERVER_CMD, RTSP_SERVER_PATH, rtspPort, mp4VideoPath));
-        List<VideoStreamInfo> success;
+        List<VideoStreamInfo> success = Lists.newArrayList();
         List<VideoStreamInfo> failed;
         //判断是否有格式转换的视频
         if (!CollectionUtils.isEmpty(videoStreamInfos)){
-            success = videoStreamInfos.stream().filter(VideoStreamInfo::getFlag).collect(Collectors.toList());
             failed = videoStreamInfos.stream().filter(e -> !e.getFlag()).collect(Collectors.toList());
         }else{
-            success = Lists.newArrayList();
             failed = Lists.newArrayList();
         }
         //如果没有转流的mp4就直接返回
         execResult = ShellUtil.exec(SH_COMMAND, String.format(FILTER_OUT_MP4_CMD, rtspVideoPath, SUFFIX_MP4));
-        videoStreamingVo = VideoStreamingVo.builder().success(success).failed(failed).build();
         if (StringUtils.isEmpty(execResult)){
             throw CommonCodeEnum.NO_STREAMING_VIDEO.buildException();
         }
         //获取所有的MP4文件，默认全部转流成功
         String[] videoNames = execResult.split(LINE_BREAK);
-        if (success.size() == 0){
-            for (String videoName : videoNames) {
-                success.add(VideoStreamInfo.builder().videoName(videoName).flag(Boolean.TRUE).build());
+        for (String videoName : videoNames) {
+            if (videoName.indexOf(SYMBOL_POINT) <= 0){
+                continue;
             }
-        }else{
-            for (String videoName : videoNames) {
-                if (success.stream().noneMatch(e -> e.getVideoName().equals(videoName))){
-                    success.add(VideoStreamInfo.builder().videoName(videoName).flag(Boolean.TRUE).build());
-                }
+            String fileSuffix = videoName.substring(videoName.lastIndexOf(SYMBOL_POINT));
+            if (SUFFIX_MP4.equals(fileSuffix)){
+                success.add(VideoStreamInfo.builder().videoName(videoName).flag(Boolean.TRUE).build());
             }
         }
         //设置rtsp流地址
@@ -139,7 +133,7 @@ public class RtspServerServiceImpl implements RtspServerService {
             videoStreamInfo.setRtspAddress(String.format(RTSP_ADDRESS, ipAddress, rtspPort, videoStreamInfo.getVideoName()));
         }
         logger.info("video streaming execution time:{}ms", System.currentTimeMillis() - start);
-        return videoStreamingVo;
+        return VideoStreamingVo.builder().success(success).failed(failed).build();
     }
 
 

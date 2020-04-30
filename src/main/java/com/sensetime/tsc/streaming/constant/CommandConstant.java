@@ -1,7 +1,6 @@
 package com.sensetime.tsc.streaming.constant;
 
-import static com.sensetime.tsc.streaming.constant.CommonConstant.FILE_SEPARATOR;
-import static com.sensetime.tsc.streaming.constant.CommonConstant.USER_DIR;
+import static com.sensetime.tsc.streaming.constant.CommonConstant.*;
 
 /**
  * @Author: zhouyuyang
@@ -13,11 +12,11 @@ public class CommandConstant {
 
     public static final String START_RTSP_SERVER_CMD = "nohup %s -loop=0 -port :%s %s >cmd.log 2>&1 & ";
 
-    private static final String RTSP_SERVER_NAME = "rtsp-server";
+    private static final String RTSP_SERVER_NAME = "component/rtsp-server";
 
     public static final String RTSP_SERVER_PATH = USER_DIR + FILE_SEPARATOR + RTSP_SERVER_NAME;
 
-    private static final String FFMPEG_NAME = "ffmpeg";
+    private static final String FFMPEG_NAME = "component/ffmpeg";
 
     public static final String FFMPEG_PATH = USER_DIR + FILE_SEPARATOR + FFMPEG_NAME;
 

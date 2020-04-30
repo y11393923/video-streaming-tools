@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>video-streaming-tools</title>
+    <style type="text/css">
+
+    </style>
+</head>
+<body>
+
+    <h2>视频上传</h2>
+    <p>单视频上传支持格式：mp4、avi、mov、wmv、flv、asx、asf、mpg、3gp</p>
+    <p>支持zip压缩包格式上传</p>
+    <div>
+        <form>
+            <p>
+                文件：<input type="file" class="file"/>
+                是否覆盖重名视频：
+                <select class="cover">
+                    <option selected="selected" value="1">是</option>
+                    <option value="2">否</option>
+                </select>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <input type="button" class="upload" value="上传"/>
+            </p>
+            <p>
+                <input type="button" class="clearAllVideos" value="清除所有上传视频"/>
+            </p>
+            <div class="result">
+
+            </div>
+        </form>
+    </div>
+
+    <hr/>
+    <h2>视频源转流</h2>
+    <div>
+        <input type="button" class="bypassFlow" value="转流"/>
+    </div>
+    <div class="message">
+        <div class="success">
+            <dl>
+                <dt style="font-weight: bold">转流成功：</dt>
+            </dl>
+        </div>
+        <div class="failed">
+            <dl>
+                <dt style="font-weight: bold">转流失败：</dt>
+            </dl>
+        </div>
+    </div>
+    <hr/>
+
+    <script type="text/javascript" th:src="@{/jquery.min.js}"></script>
+    <script>
+        $(function () {
+            $(".message").hide();
+            $(".bypassFlow").click(function () {
+                $(".message dl dd").remove();
+                $(".failed dl dd").remove();
+                $.ajax({
+                    url: "/rtsp-server/diversion",
+                    type: "GET",
+                    dataType: "json",
+                    success: function (result) {
+                        var data = result.data;
+                        if (result.errorCode === "0"){
+                            let dd = "";
+                            $.each(data.success, function (i, obj) {
+                                dd += "<dd>"+obj.rtspAddress+"</dd>";
+                            })
+                            $(".success dl").append(dd);
+                            dd = "";
+                            $.each(data.failed, function (i, obj) {
+                                dd += "<dd>"+obj.videoName+"&nbsp&nbsp&nbsp&nbsp原因:"+obj.errorMsg;
+                                if (obj.detail !== ""){
+                                    dd += "&nbsp&nbsp&nbsp&nbsp详情:" + obj.detail;
+                                }
+                                dd+= "</dd>";
+                            })
+                            $(".failed dl").append(dd);
+                            $(".message").show();
+                        } else{
+                            alert("转流失败:" + result.errorMsg);
+                        }
+                    }
+                })
+            })
+            $(".upload").click(function () {
+                $(".result").html("");
+                var file = $(".file").val();
+                if (file === ""){
+                    alert("请选择上传的文件");
+                    return false;
+                }
+                let size = $(".file")[0].files[0].size;
+                if (size > 536870912){
+                    alert("上传文件不能超过512MB")
+                    return false;
+                }
+                let val = $(".cover").val();
+                let cover = true;
+                if (val !== "1"){
+                    cover = false;
+                }
+                let fileName = file.substring(file.lastIndexOf(".") + 1).toLowerCase();
+                let type = 1;
+                if(fileName === "zip"){
+                    type = 2;
+                }
+                var formData = new FormData();
+                formData.append("file", $(".file")[0].files[0]);
+                formData.append("type", type);
+                formData.append("cover", cover);
+                $.ajax({
+                    url: "/video/upload",
+                    type: "POST",
+                    dataType: "json",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (result) {
+                        if(result.errorCode === "0"){
+                            let data = result.data;
+                            if (data.success !== undefined){
+                                var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
+                                $(".result").append(success);
+                            }
+                            if (data.failed !== undefined && data.failed !== 0){
+                                var failed = "<dl style='color: red'><dt>上传失败" + data.failed + "个视频</dt>";
+                                $.each(data.failedVos, function (i, obj) {
+                                    failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
+                                })
+                                failed +="</dl>";
+                                $(".result").append(failed);
+                            }
+                        }else{
+                            alert("上传失败:" + result.errorMsg)
+                        }
+                    }
+                })
+            })
+            $(".clearAllVideos").click(function () {
+                $(".result").html("");
+                $.ajax({
+                    url: "/video/clear",
+                    type: "DELETE",
+                    dataType: "json",
+                    success: function (result) {
+                        if(result.errorCode === "0"){
+                            alert("清理成功");
+                        }else{
+                            alert("清理失败:" + result.errorMsg)
+                        }
+                    }
+                })
+            })
+        })
+    </script>
+</body>
+</html>
