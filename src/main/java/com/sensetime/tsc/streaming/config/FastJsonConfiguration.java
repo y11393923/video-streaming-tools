@@ -14,7 +14,7 @@ import org.springframework.http.converter.FormHttpMessageConverter;
  * @Date: 2020/4/16 16:25
  */
 @Configuration
-public class FastJsonConfig {
+public class FastJsonConfiguration {
 
     @Bean
     public HttpMessageConverters httpMessageConverters() {

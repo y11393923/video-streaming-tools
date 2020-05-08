@@ -1,30 +1,25 @@
 package com.sensetime.tsc.streaming.service.impl;
 
 import com.google.common.collect.Lists;
+import com.sensetime.tsc.streaming.config.InitializeConfiguration;
 import com.sensetime.tsc.streaming.enums.CommonCodeEnum;
 import com.sensetime.tsc.streaming.response.VideoStreamInfo;
 import com.sensetime.tsc.streaming.response.VideoUploadVo;
 import com.sensetime.tsc.streaming.service.VideoService;
-import com.sensetime.tsc.streaming.utils.CheckChineseUtil;
-import com.sensetime.tsc.streaming.utils.ShellUtil;
-import com.sensetime.tsc.streaming.utils.VideoUploadVoUtil;
-import com.sensetime.tsc.streaming.utils.ZipUtil;
+import com.sensetime.tsc.streaming.utils.*;
 import org.apache.tools.zip.ZipEntry;
 import org.apache.tools.zip.ZipFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.PostConstruct;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.sensetime.tsc.streaming.constant.CommandConstant.*;
@@ -38,32 +33,18 @@ import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.*;
  */
 @Service
 public class VideoServiceImpl implements VideoService {
-    @Value("${rtsp.video-path:}")
-    private String rtspVideoPath;
-    @Value("${pool.corePoolSize:}")
-    private String corePoolSize;
 
-    private ThreadPoolExecutor threadPoolExecutor;
-
-
-    @PostConstruct
-    private void init(){
-        if (StringUtils.isEmpty(rtspVideoPath)){
-            rtspVideoPath = VIDEO_PATH;
-        }else{
-            if (!rtspVideoPath.endsWith(FILE_SEPARATOR)){
-                rtspVideoPath += FILE_SEPARATOR;
-            }
-        }
-        //初始化线程池
-        int coreThreadPoolSize = StringUtils.isEmpty(corePoolSize) ? Runtime.getRuntime().availableProcessors() : Integer.parseInt(corePoolSize);
-        threadPoolExecutor = new ThreadPoolExecutor(coreThreadPoolSize, coreThreadPoolSize, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), new DefaultThreadFactory("exec-command"));
-    }
+    @Autowired
+    private ExecCommandUtil execCommandUtil;
+    @Autowired
+    private ZipUtil zipUtil;
+    @Autowired
+    private InitializeConfiguration configuration;
 
     @Override
     public VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file) throws Exception {
         checkParam(type, file);
-        String videoStoragePath = rtspVideoPath;
+        String videoStoragePath = configuration.getRtspVideoPath();
         //检查视频上传路径，不存在则创建
         File videoFile = new File(videoStoragePath);
         if (!videoFile.exists() || !videoFile.isDirectory()){
@@ -92,12 +73,9 @@ public class VideoServiceImpl implements VideoService {
                 }
             }
             file.transferTo(newFile);
-            return VideoUploadVo.builder()
-                    .success(1)
-                    .build();
+            return VideoUploadVo.builder().success(1).build();
         }else if (VIDEO_UPLOAD_TYPE_TWO.equals(type)){
-            String zipUploadPathName = UUID.randomUUID().toString();
-            String zipUploadPath = videoStoragePath + zipUploadPathName + FILE_SEPARATOR;
+            String zipUploadPath = videoStoragePath + UUID.randomUUID().toString() + FILE_SEPARATOR;
             File zipFilePath = new File(zipUploadPath);
             //创建zip文件存放路径
             if (!zipFilePath.exists() || !zipFilePath.isDirectory()){
@@ -107,61 +85,7 @@ public class VideoServiceImpl implements VideoService {
             }
             newFile = new File(zipUploadPath + fileName);
             file.transferTo(newFile);
-            ZipFile zipFile = null;
-            InputStream inputStream = null;
-            FileOutputStream outputStream = null;
-            List<VideoUploadVo.UploadFailedVo> failedVos = Lists.newArrayList();
-            int success = 0;
-            try{
-                zipFile = new ZipFile(newFile);
-                for (Enumeration entries = zipFile.getEntries(); entries.hasMoreElements();){
-                    ZipEntry entry = (ZipEntry) entries.nextElement();
-                    fileName = entry.getName();
-                    if (entry.isDirectory() || fileName.indexOf(SYMBOL_POINT) <= 0){
-                        continue;
-                    }
-                    //不能包含中文
-                    if (CheckChineseUtil.isContainChinese(fileName)){
-                        failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_NAME_CANNOT_CONTAIN_CHINESE.getValue()));
-                        continue;
-                    }
-                    //判断视频文件是否支持
-                    String videoFileSuffix = fileName.substring(fileName.lastIndexOf(SYMBOL_POINT) + 1);
-                    if (!VIDEO_SUFFIX_FORMAT.contains(videoFileSuffix)){
-                        failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, UNSUPPORTED_FORMAT.getValue()));
-                        continue;
-                    }
-                    String newFilePath = rtspVideoPath + entry.getName();
-                    File temp = new File(newFilePath);
-                    if (temp.exists() && !temp.isDirectory()){
-                        if (!cover){
-                            failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_ALREADY_EXISTS.getValue()));
-                            continue;
-                        }
-                        //如果删除失败则用命令删除
-                        if (!newFile.delete()){
-                            ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, newFilePath));
-                        }
-                    }
-                    //将视频解压到指定位置
-                    inputStream = zipFile.getInputStream(entry);
-                    outputStream = new FileOutputStream(temp);
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    int readBytes;
-                    while((readBytes = inputStream.read(buffer)) > 0){
-                        outputStream.write(buffer , 0 , readBytes);
-                    }
-                    success++;
-                }
-            }finally {
-                closeStream(zipFile, outputStream, inputStream);
-            }
-            ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, zipUploadPath));
-            return VideoUploadVo.builder()
-                    .failedVos(failedVos)
-                    .failed(failedVos.size())
-                    .success(success)
-                    .build();
+            return zipUtil.unzip(newFile, zipUploadPath, cover);
         }
         return VideoUploadVo.builder().build();
     }
@@ -229,101 +153,15 @@ public class VideoServiceImpl implements VideoService {
             }
             if (!CollectionUtils.isEmpty(commands)){
                 //视频格式转换
-                videoStreamInfos.addAll(execCommand(commands));
+                videoStreamInfos.addAll(execCommandUtil.execCommand(commands));
             }
         }
         return videoStreamInfos;
-    }
-
-
-    /**
-     * 多线程执行命令同步返回
-     * @param commands
-     * @return
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    private List<VideoStreamInfo> execCommand(List<VideoStreamInfo> commands) throws InterruptedException, ExecutionException {
-        List<VideoStreamInfo> videoStreamInfos = Lists.newArrayList();
-        CountDownLatch countDownLatch = new CountDownLatch(commands.size());
-        for (VideoStreamInfo videoStreamInfo : commands) {
-            ExecCommandThread execCommandThread = new ExecCommandThread(videoStreamInfo, countDownLatch);
-            Future<VideoStreamInfo> future = threadPoolExecutor.submit(execCommandThread);
-            videoStreamInfos.add(future.get());
-        }
-        countDownLatch.await();
-        return videoStreamInfos;
-    }
-
-    static class ExecCommandThread implements Callable<VideoStreamInfo> {
-        private static final Logger logger = LoggerFactory.getLogger(ExecCommandThread.class);
-
-        private VideoStreamInfo videoStreamInfo;
-        private CountDownLatch countDownLatch;
-
-        ExecCommandThread(VideoStreamInfo videoStreamInfo, CountDownLatch countDownLatch) {
-            this.videoStreamInfo = videoStreamInfo;
-            this.countDownLatch = countDownLatch;
-        }
-
-        @Override
-        public VideoStreamInfo call() throws Exception {
-            try {
-                ShellUtil.exec(SH_COMMAND, videoStreamInfo.getCommand());
-            } catch (Exception e) {
-                logger.error("exec command failed", e);
-                videoStreamInfo.setFlag(Boolean.FALSE);
-                videoStreamInfo.setErrorMsg(VIDEO_FORMAT_CONVERSION_ERROR.getValue());
-                videoStreamInfo.setDetail(e.getMessage());
-            }
-            countDownLatch.countDown();
-            return videoStreamInfo;
-        }
-    }
-
-    static class DefaultThreadFactory implements ThreadFactory {
-        private static final AtomicInteger POOL_NUMBER = new AtomicInteger(1);
-        private final ThreadGroup group;
-        private final AtomicInteger THREAD_NUMBER = new AtomicInteger(1);
-        private final String namePrefix;
-
-        DefaultThreadFactory(String namePrefix) {
-            SecurityManager s = System.getSecurityManager();
-            group = (s != null) ? s.getThreadGroup() :
-                    Thread.currentThread().getThreadGroup();
-            this.namePrefix = (namePrefix == null ? "pool-" : namePrefix + "-") + POOL_NUMBER.getAndIncrement();
-        }
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(group, r,
-                    namePrefix + THREAD_NUMBER.getAndIncrement(),
-                    0);
-            if (t.isDaemon()) {
-                t.setDaemon(false);
-            }
-            if (t.getPriority() != Thread.NORM_PRIORITY) {
-                t.setPriority(Thread.NORM_PRIORITY);
-            }
-            return t;
-        }
     }
 
     @Override
     public void clearAllVideos() throws IOException {
-        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, rtspVideoPath + SYMBOL_ASTERISK));
-    }
-
-
-    private void closeStream(ZipFile zipFile, OutputStream outputStream, InputStream inputStream) throws IOException {
-        if (Objects.nonNull(zipFile)){
-            zipFile.close();
-        }
-        if (Objects.nonNull(outputStream)){
-            outputStream.close();
-        }
-        if (Objects.nonNull(inputStream)){
-            inputStream.close();
-        }
+        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, configuration.getRtspVideoPath() + SYMBOL_ASTERISK));
     }
 
     private void checkParam(Integer type, MultipartFile file){
