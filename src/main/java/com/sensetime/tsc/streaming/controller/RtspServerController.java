@@ -26,7 +26,7 @@ public class RtspServerController {
         try {
             return BaseResultUtil.buildBaseResult(rtspServerService.videoStreaming());
         } catch (Exception e) {
-            logger.error("video streaming execution failed  ", e);
+            logger.error("video streaming execution failed   ", e);
             return BaseResultUtil.buildBaseResult(e.getMessage());
         }
     }
