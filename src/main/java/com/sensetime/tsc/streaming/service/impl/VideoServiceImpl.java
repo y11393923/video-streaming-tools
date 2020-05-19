@@ -42,7 +42,7 @@ public class VideoServiceImpl implements VideoService {
     private InitializeConfiguration configuration;
 
     @Override
-    public VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file) throws Exception {
+    public VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file, String id) throws Exception {
         checkParam(type, file);
         String videoStoragePath = configuration.getRtspVideoPath();
         //检查视频上传路径，不存在则创建
@@ -85,9 +85,14 @@ public class VideoServiceImpl implements VideoService {
             }
             newFile = new File(zipUploadPath + fileName);
             file.transferTo(newFile);
-            return zipUtil.unzip(newFile, zipUploadPath, cover);
+            return zipUtil.unzip(newFile, zipUploadPath, cover, id);
         }
         return VideoUploadVo.builder().build();
+    }
+
+    @Override
+    public VideoUploadVo uploadSchedule(String id) throws Exception {
+        return zipUtil.get(id);
     }
 
     @Override

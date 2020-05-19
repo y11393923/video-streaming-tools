@@ -33,7 +33,9 @@ public class CommonConstant {
 
     public static final String ZIP_ENCODING = "GBK";
 
-    public static final Integer BUFFER_SIZE = 1024;
+    public static final Integer BUFFER_SIZE = 4096;
+
+    public static final Integer MAP_MAX_SIZE = 16;
 
     /**
      * 初始化ffmpeg支持的视频格式

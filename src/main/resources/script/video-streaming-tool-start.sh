@@ -61,14 +61,6 @@ stop_app() {
 
 
 start_monitor() {
-  while [ 1 ]; do
-    if ! $(running $PID) ; then
-      echo "$(date '+%Y-%m-%d %T') $BINFILE is gone. monitor pid $!" >> $MONITOR_LOG
-      start_app
-      echo "$(date '+%Y-%m-%d %T') $BINFILE started. monitor pid $!" >> $MONITOR_LOG
-    fi
-    sleep $MONITOR_INTERVAL
-  done &
   MONITOR_PID=$!
   echo "monitor pid VideoStreamingToolApplication-$!"
   echo $! > $MONITOR_PIDFILE

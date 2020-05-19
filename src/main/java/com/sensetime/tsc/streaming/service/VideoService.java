@@ -21,7 +21,15 @@ public interface VideoService {
      * @param file
      * @return
      */
-    VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file) throws Exception ;
+    VideoUploadVo upload(Integer type, Boolean cover, MultipartFile file, String id) throws Exception ;
+
+    /**
+     * 获取上传进度
+     * @param id
+     * @return
+     * @throws Exception
+     */
+    VideoUploadVo uploadSchedule(String id) throws Exception ;
 
     /**
      * 视频格式转换

@@ -23,12 +23,17 @@
                     <option selected="selected" value="1">是</option>
                     <option value="2">否</option>
                 </select>
-                &nbsp;&nbsp;&nbsp;&nbsp;
-                <input type="button" class="upload" value="上传"/>
             </p>
             <p>
+                <input type="button"  style="width: 80px" class="upload" value="上传"/>
+                &nbsp;&nbsp;&nbsp;&nbsp;
                 <input type="button" class="clearAllVideos" value="清除所有上传视频"/>
             </p>
+            <div class="uploadSchedule" style='color: green'>
+                <div>
+                    <span class="schedule"></span>
+                </div>
+            </div>
             <div class="result">
 
             </div>
@@ -90,7 +95,11 @@
                     }
                 })
             })
+            var scheduleId ;
+            var interval;
+
             $(".upload").click(function () {
+                var thisObj = $(this);
                 $(".result").html("");
                 var file = $(".file").val();
                 if (file === ""){
@@ -98,8 +107,8 @@
                     return false;
                 }
                 let size = $(".file")[0].files[0].size;
-                if (size > 536870912){
-                    alert("上传文件不能超过512MB")
+                if (size > 5368709120){
+                    alert("上传文件不能超过5GB")
                     return false;
                 }
                 let val = $(".cover").val();
@@ -112,8 +121,14 @@
                 if(fileName === "zip"){
                     type = 2;
                 }
+                thisObj.attr("disabled", true);
+
+                scheduleId = uuid();
+                $(".uploadSchedule").show();
+                $(".schedule").html("上传中，请耐心等待！");
                 var formData = new FormData();
                 formData.append("file", $(".file")[0].files[0]);
+                formData.append("id", scheduleId);
                 formData.append("type", type);
                 formData.append("cover", cover);
                 $.ajax({
@@ -121,11 +136,52 @@
                     type: "POST",
                     dataType: "json",
                     data: formData,
+                    async: true,
                     processData: false,
                     contentType: false,
                     success: function (result) {
                         if(result.errorCode === "0"){
+                            if(fileName === "zip"){
+                                interval = setInterval(schedule, 1000);
+                            }else{
+                                let data = result.data;
+                                if (data.success !== undefined){
+                                    var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
+                                    $(".result").append(success);
+                                }
+                                if (data.failed !== undefined && data.failed !== 0){
+                                    var failed = "<dl style='color: red'><dt>上传失败" + data.failed + "个视频</dt>";
+                                    $.each(data.failedVos, function (i, obj) {
+                                        failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
+                                    })
+                                    failed +="</dl>";
+                                    $(".result").append(failed);
+                                }
+                                thisObj.attr("disabled", false);
+                            }
+                        }else{
+                            alert("上传失败:" + result.errorMsg)
+                            thisObj.attr("disabled", false);
+                        }
+                    }
+                })
+            });
+
+            $(".uploadSchedule").hide();
+            function schedule(){
+                $(".uploadSchedule").show();
+                $.ajax({
+                    url: "/video/upload/schedule/" + scheduleId,
+                    type: "GET",
+                    processData: false,
+                    contentType: false,
+                    success: function (result) {
+                        if(result.errorCode === "0"){
+                            $(".result").html("");
                             let data = result.data;
+                            let count = data.success + data.failed;
+                            let num = ((count / data.totalCount) * 100).toFixed(0);
+                            $(".schedule").html("上传进度： "+ num + "%");
                             if (data.success !== undefined){
                                 var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
                                 $(".result").append(success);
@@ -138,26 +194,50 @@
                                 failed +="</dl>";
                                 $(".result").append(failed);
                             }
+                            if (count === data.totalCount){
+                                $(".upload").attr("disabled", false);
+                                clearInterval(interval);
+                            }
                         }else{
-                            alert("上传失败:" + result.errorMsg)
+                            $(".result").html("");
+                            $(".schedule").html('');
+                            console.log("获取上传进度失败")
                         }
                     }
                 })
-            })
+            }
+
+            function uuid() {
+                var s = [];
+                var hexDigits = "0123456789abcdef";
+                for (var i = 0; i < 36; i++) {
+                    s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
+                }
+                s[14] = "4";  // bits 12-15 of the time_hi_and_version field to 0010
+                s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1);  // bits 6-7 of the clock_seq_hi_and_reserved to 01
+                s[8] = s[13] = s[18] = s[23] = "-";
+
+                return s.join("");
+            }
+
             $(".clearAllVideos").click(function () {
-                $(".result").html("");
-                $.ajax({
-                    url: "/video/clear",
-                    type: "DELETE",
-                    dataType: "json",
-                    success: function (result) {
-                        if(result.errorCode === "0"){
-                            alert("清理成功");
-                        }else{
-                            alert("清理失败:" + result.errorMsg)
+                if (confirm("确定清除所有上传视频吗？")){
+                    $.ajax({
+                        url: "/video/clear",
+                        type: "DELETE",
+                        dataType: "json",
+                        success: function (result) {
+                            if(result.errorCode === "0"){
+                                $(".result").html("");
+                                $(".uploadSchedule").hide();
+                                $(".schedule").html("");
+                                alert("清理成功");
+                            }else{
+                                alert("清理失败:" + result.errorMsg)
+                            }
                         }
-                    }
-                })
+                    })
+                }
             })
         })
     </script>

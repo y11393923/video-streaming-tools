@@ -2,7 +2,6 @@ package com.sensetime.tsc.streaming.utils;
 
 import com.google.common.collect.Lists;
 import com.sensetime.tsc.streaming.config.InitializeConfiguration;
-import com.sensetime.tsc.streaming.response.VideoStreamInfo;
 import com.sensetime.tsc.streaming.response.VideoUploadVo;
 import lombok.SneakyThrows;
 import org.apache.tools.ant.Project;
@@ -17,12 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.sensetime.tsc.streaming.constant.CommandConstant.RM_COMMAND;
@@ -39,6 +34,11 @@ public class ZipUtil {
 
     @Autowired
     private InitializeConfiguration configuration;
+
+    private Map<String, VideoUploadVo> uploadScheduleMap = new ConcurrentHashMap<>();
+
+    private Map<String, ZipFile> zipFileMap = new ConcurrentHashMap<>();
+
 
     /**
      * 压缩文件和文件夹
@@ -101,33 +101,39 @@ public class ZipUtil {
         logger.info("uncompress success.");
     }
 
+    public VideoUploadVo get(String id) throws IOException {
+        VideoUploadVo videoUploadVo = uploadScheduleMap.get(id);
+        if (Objects.nonNull(videoUploadVo)){
+            if ((videoUploadVo.getSuccess() + videoUploadVo.getFailed()) == videoUploadVo.getTotalCount()){
+                //解压后删除上传zip文件
+                ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, videoUploadVo.getZipUploadPath()));
+                zipFileMap.remove(id).close();
+            }
+        }
+        return videoUploadVo;
+    }
 
-    public VideoUploadVo unzip(File file, String zipUploadPath, Boolean cover) throws Exception {
+
+    public VideoUploadVo unzip(File file, String zipUploadPath, Boolean cover, String id) throws Exception {
         ZipFile zipFile = new ZipFile(file);
+        zipFileMap.put(id, zipFile);
         List<ZipEntry> zipEntries = Lists.newArrayList();
         //遍历zip中所有的文件
         for (Enumeration entries = zipFile.getEntries(); entries.hasMoreElements();){
             ZipEntry entry = (ZipEntry) entries.nextElement();
             zipEntries.add(entry);
         }
-        List<VideoUploadVo.UploadFailedVo> failedVos = Lists.newArrayList();
-        AtomicInteger atomicInteger = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(zipEntries.size());
+        List<VideoUploadVo.UploadFailedVo> failedVos = Collections.synchronizedList(Lists.newArrayList());
+        AtomicInteger atomicInteger = new AtomicInteger(1);
+        VideoUploadVo videoUploadVo = VideoUploadVo.builder().totalCount(zipEntries.size()).failed(0).success(0).zipUploadPath(zipUploadPath).build();
+        uploadScheduleMap.put(id, videoUploadVo);
         //多线程解压文件
         for (ZipEntry zipEntry : zipEntries) {
             VideoUploadThread thread = new VideoUploadThread(zipFile, zipEntry, cover,
-                    configuration.getRtspVideoPath(), failedVos, atomicInteger, countDownLatch);
+                    configuration.getRtspVideoPath(), failedVos, atomicInteger, id, uploadScheduleMap);
             configuration.getThreadPoolExecutor().execute(thread);
         }
-        countDownLatch.await();
-        zipFile.close();
-        //解压后删除上传zip文件
-        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, zipUploadPath));
-        return VideoUploadVo.builder()
-                .failedVos(failedVos)
-                .failed(failedVos.size())
-                .success(atomicInteger.get())
-                .build();
+        return videoUploadVo;
     }
 
     static class VideoUploadThread implements Runnable {
@@ -137,19 +143,21 @@ public class ZipUtil {
         private ZipEntry zipEntry;
         private Boolean cover;
         private String rtspVideoPath;
-        private CountDownLatch countDownLatch;
         private List<VideoUploadVo.UploadFailedVo> failedVos;
         private AtomicInteger atomicInteger;
+        private String id;
+        private Map<String, VideoUploadVo> uploadScheduleMap;
 
-        VideoUploadThread(ZipFile zipFile, ZipEntry zipEntry, Boolean cover, String rtspVideoPath,
-                          List<VideoUploadVo.UploadFailedVo> failedVos, AtomicInteger atomicInteger, CountDownLatch countDownLatch) {
+        VideoUploadThread(ZipFile zipFile, ZipEntry zipEntry, Boolean cover, String rtspVideoPath, List<VideoUploadVo.UploadFailedVo> failedVos,
+                          AtomicInteger atomicInteger, String id , Map<String, VideoUploadVo> uploadScheduleMap) {
             this.zipFile = zipFile;
             this.zipEntry = zipEntry;
             this.cover = cover;
             this.rtspVideoPath = rtspVideoPath;
-            this.countDownLatch = countDownLatch;
             this.failedVos = failedVos;
             this.atomicInteger = atomicInteger;
+            this.id = id;
+            this.uploadScheduleMap = uploadScheduleMap;
         }
 
         @SneakyThrows
@@ -158,6 +166,7 @@ public class ZipUtil {
             InputStream inputStream = null;
             FileOutputStream outputStream = null;
             String fileName = zipEntry.getName();
+            VideoUploadVo videoUploadVo = uploadScheduleMap.get(id);
             try {
                 if (zipEntry.isDirectory() || fileName.indexOf(SYMBOL_POINT) <= 0){
                     return;
@@ -193,7 +202,7 @@ public class ZipUtil {
                 while((readBytes = inputStream.read(buffer)) > 0){
                     outputStream.write(buffer , 0 , readBytes);
                 }
-                atomicInteger.getAndIncrement();
+                videoUploadVo.setSuccess(atomicInteger.getAndIncrement());
             }catch (Exception e){
                 logger.error("video upload thread failed ", e);
                 failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, e.getMessage()));
@@ -204,10 +213,12 @@ public class ZipUtil {
                 if (Objects.nonNull(inputStream)){
                     inputStream.close();
                 }
+                videoUploadVo.setFailedVos(failedVos);
+                videoUploadVo.setFailed(failedVos.size());
+                uploadScheduleMap.put(id, videoUploadVo);
             }
-            countDownLatch.countDown();
         }
-
     }
+
 
 }

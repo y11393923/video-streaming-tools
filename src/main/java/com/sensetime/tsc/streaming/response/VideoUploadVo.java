@@ -8,11 +8,15 @@ import java.util.List;
 @Data
 @Builder
 public class VideoUploadVo {
+    private Integer totalCount;
+
     private Integer success;
 
     private Integer failed;
 
     private List<UploadFailedVo> failedVos;
+
+    private String zipUploadPath;
 
     @Data
     @Builder

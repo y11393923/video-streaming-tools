@@ -7,10 +7,7 @@ import com.sensetime.tsc.streaming.utils.BaseResultUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -34,10 +31,21 @@ public class VideoController {
      */
     @RequestMapping(value = "/upload", method = RequestMethod.POST)
     public BaseResult upload(@RequestParam("type") Integer type,
+                             @RequestParam("id") String id,
                              @RequestParam(value = "cover", required = false, defaultValue = "true") Boolean cover,
                              @RequestParam("file") MultipartFile file){
         try {
-            return BaseResultUtil.buildBaseResult(videoService.upload(type, cover, file));
+            return BaseResultUtil.buildBaseResult(videoService.upload(type, cover, file, id));
+        }catch (Exception e){
+            logger.error("video upload failed ", e);
+            return BaseResultUtil.buildBaseResult(e.getMessage());
+        }
+    }
+
+    @RequestMapping(value = "/upload/schedule/{id}", method = RequestMethod.GET)
+    public BaseResult schedule(@PathVariable("id")String id){
+        try {
+            return BaseResultUtil.buildBaseResult(videoService.uploadSchedule(id));
         }catch (Exception e){
             logger.error("video upload failed ", e);
             return BaseResultUtil.buildBaseResult(e.getMessage());
