@@ -141,24 +141,7 @@
                     contentType: false,
                     success: function (result) {
                         if(result.errorCode === "0"){
-                            if(fileName === "zip"){
-                                interval = setInterval(schedule, 1000);
-                            }else{
-                                let data = result.data;
-                                if (data.success !== undefined){
-                                    var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
-                                    $(".result").append(success);
-                                }
-                                if (data.failed !== undefined && data.failed !== 0){
-                                    var failed = "<dl style='color: red'><dt>上传失败" + data.failed + "个视频</dt>";
-                                    $.each(data.failedVos, function (i, obj) {
-                                        failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
-                                    })
-                                    failed +="</dl>";
-                                    $(".result").append(failed);
-                                }
-                                thisObj.attr("disabled", false);
-                            }
+                            interval = setInterval(schedule, 500);
                         }else{
                             alert("上传失败:" + result.errorMsg)
                             thisObj.attr("disabled", false);
@@ -179,22 +162,23 @@
                         if(result.errorCode === "0"){
                             $(".result").html("");
                             let data = result.data;
-                            let count = data.success + data.failed;
-                            let num = ((count / data.totalCount) * 100).toFixed(0);
+                            let num = ((data.uploadByteSize / data.totalByteSize) * 100).toFixed(1);
                             $(".schedule").html("上传进度： "+ num + "%");
-                            if (data.success !== undefined){
-                                var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
-                                $(".result").append(success);
-                            }
-                            if (data.failed !== undefined && data.failed !== 0){
-                                var failed = "<dl style='color: red'><dt>上传失败" + data.failed + "个视频</dt>";
-                                $.each(data.failedVos, function (i, obj) {
-                                    failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
-                                })
-                                failed +="</dl>";
-                                $(".result").append(failed);
-                            }
+
+                            let count = data.success + data.failed;
                             if (count === data.totalCount){
+                                if (data.success !== undefined){
+                                    var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
+                                    $(".result").append(success);
+                                }
+                                if (data.failed !== undefined && data.failed !== 0){
+                                    var failed = "<dl style='color: red'><dt>上传失败" + data.failed + "个视频</dt>";
+                                    $.each(data.failedVos, function (i, obj) {
+                                        failed += "<dd>"+ obj.videoName + "失败原因：" + obj.message +"</dd>";
+                                    })
+                                    failed +="</dl>";
+                                    $(".result").append(failed);
+                                }
                                 $(".upload").attr("disabled", false);
                                 clearInterval(interval);
                             }

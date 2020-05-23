@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.*;
 import java.util.*;
@@ -105,32 +106,70 @@ public class ZipUtil {
         VideoUploadVo videoUploadVo = uploadScheduleMap.get(id);
         if (Objects.nonNull(videoUploadVo)){
             if ((videoUploadVo.getSuccess() + videoUploadVo.getFailed()) == videoUploadVo.getTotalCount()){
-                //解压后删除上传zip文件
-                ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, videoUploadVo.getZipUploadPath()));
-                zipFileMap.remove(id).close();
+                if (!StringUtils.isEmpty(videoUploadVo.getZipUploadPath())){
+                    //解压后删除上传zip文件
+                    ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, videoUploadVo.getZipUploadPath()));
+                    zipFileMap.remove(id).close();
+                }
+                uploadScheduleMap.remove(id);
             }
         }
         return videoUploadVo;
     }
 
+    public void put(String id, VideoUploadVo videoUploadVo){
+        this.uploadScheduleMap.put(id, videoUploadVo);
+    }
+
+
 
     public VideoUploadVo unzip(File file, String zipUploadPath, Boolean cover, String id) throws Exception {
         ZipFile zipFile = new ZipFile(file);
         zipFileMap.put(id, zipFile);
+        List<VideoUploadVo.UploadFailedVo> failedVos = Collections.synchronizedList(Lists.newArrayList());
         List<ZipEntry> zipEntries = Lists.newArrayList();
+        long totalByteSize = 0;
         //遍历zip中所有的文件
         for (Enumeration entries = zipFile.getEntries(); entries.hasMoreElements();){
-            ZipEntry entry = (ZipEntry) entries.nextElement();
-            zipEntries.add(entry);
+            ZipEntry zipEntry = (ZipEntry) entries.nextElement();
+            String fileName = zipEntry.getName();
+            if (zipEntry.isDirectory() || fileName.indexOf(SYMBOL_POINT) <= 0){
+                continue;
+            }
+            //不能包含中文
+            if (CheckChineseUtil.isContainChinese(fileName)){
+                failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_NAME_CANNOT_CONTAIN_CHINESE.getValue()));
+                continue;
+            }
+            //判断视频文件是否支持
+            String videoFileSuffix = fileName.substring(fileName.lastIndexOf(SYMBOL_POINT) + 1);
+            if (!VIDEO_SUFFIX_FORMAT.contains(videoFileSuffix)){
+                failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, UNSUPPORTED_FORMAT.getValue()));
+                continue;
+            }
+            String newFilePath = configuration.getRtspVideoPath() + zipEntry.getName();
+            File temp = new File(newFilePath);
+            if (temp.exists() && !temp.isDirectory()){
+                if (!cover){
+                    failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_ALREADY_EXISTS.getValue()));
+                    continue;
+                }
+                //如果删除失败则用命令删除
+                if (!temp.delete()){
+                    ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, newFilePath));
+                }
+            }
+            totalByteSize += zipEntry.getSize();
+            zipEntries.add(zipEntry);
         }
-        List<VideoUploadVo.UploadFailedVo> failedVos = Collections.synchronizedList(Lists.newArrayList());
-        AtomicInteger atomicInteger = new AtomicInteger(1);
-        VideoUploadVo videoUploadVo = VideoUploadVo.builder().totalCount(zipEntries.size()).failed(0).success(0).zipUploadPath(zipUploadPath).build();
+        AtomicInteger successCount = new AtomicInteger();
+        VideoUploadVo videoUploadVo = VideoUploadVo.builder().failedVos(failedVos).failed(failedVos.size())
+                .totalByteSize(totalByteSize).totalCount(zipEntries.size()).zipUploadPath(zipUploadPath).build();
         uploadScheduleMap.put(id, videoUploadVo);
         //多线程解压文件
         for (ZipEntry zipEntry : zipEntries) {
-            VideoUploadThread thread = new VideoUploadThread(zipFile, zipEntry, cover,
-                    configuration.getRtspVideoPath(), failedVos, atomicInteger, id, uploadScheduleMap);
+            VideoUploadThread thread = new VideoUploadThread(zipFile, zipEntry, configuration.getRtspVideoPath()
+                    , failedVos, successCount, id, uploadScheduleMap);
             configuration.getThreadPoolExecutor().execute(thread);
         }
         return videoUploadVo;
@@ -141,21 +180,19 @@ public class ZipUtil {
 
         private ZipFile zipFile;
         private ZipEntry zipEntry;
-        private Boolean cover;
         private String rtspVideoPath;
         private List<VideoUploadVo.UploadFailedVo> failedVos;
-        private AtomicInteger atomicInteger;
+        private AtomicInteger successCount;
         private String id;
         private Map<String, VideoUploadVo> uploadScheduleMap;
 
-        VideoUploadThread(ZipFile zipFile, ZipEntry zipEntry, Boolean cover, String rtspVideoPath, List<VideoUploadVo.UploadFailedVo> failedVos,
-                          AtomicInteger atomicInteger, String id , Map<String, VideoUploadVo> uploadScheduleMap) {
+        VideoUploadThread(ZipFile zipFile, ZipEntry zipEntry, String rtspVideoPath, List<VideoUploadVo.UploadFailedVo> failedVos,
+                          AtomicInteger successCount, String id , Map<String, VideoUploadVo> uploadScheduleMap) {
             this.zipFile = zipFile;
             this.zipEntry = zipEntry;
-            this.cover = cover;
             this.rtspVideoPath = rtspVideoPath;
             this.failedVos = failedVos;
-            this.atomicInteger = atomicInteger;
+            this.successCount = successCount;
             this.id = id;
             this.uploadScheduleMap = uploadScheduleMap;
         }
@@ -163,58 +200,32 @@ public class ZipUtil {
         @SneakyThrows
         @Override
         public void run() {
-            InputStream inputStream = null;
-            FileOutputStream outputStream = null;
             String fileName = zipEntry.getName();
+            String newFilePath = rtspVideoPath + zipEntry.getName();
             VideoUploadVo videoUploadVo = uploadScheduleMap.get(id);
-            try {
-                if (zipEntry.isDirectory() || fileName.indexOf(SYMBOL_POINT) <= 0){
-                    return;
-                }
-                //不能包含中文
-                if (CheckChineseUtil.isContainChinese(fileName)){
-                    failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_NAME_CANNOT_CONTAIN_CHINESE.getValue()));
-                    return;
-                }
-                //判断视频文件是否支持
-                String videoFileSuffix = fileName.substring(fileName.lastIndexOf(SYMBOL_POINT) + 1);
-                if (!VIDEO_SUFFIX_FORMAT.contains(videoFileSuffix)){
-                    failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, UNSUPPORTED_FORMAT.getValue()));
-                    return;
-                }
-                String newFilePath = rtspVideoPath + zipEntry.getName();
-                File temp = new File(newFilePath);
-                if (temp.exists() && !temp.isDirectory()){
-                    if (!cover){
-                        failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, VIDEO_ALREADY_EXISTS.getValue()));
-                        return;
-                    }
-                    //如果删除失败则用命令删除
-                    if (!temp.delete()){
-                        ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, newFilePath));
-                    }
-                }
+            try (InputStream inputStream = zipFile.getInputStream(zipEntry);
+                OutputStream outputStream = new FileOutputStream(new File(newFilePath))){
                 //将视频解压到指定位置
-                inputStream = zipFile.getInputStream(zipEntry);
-                outputStream = new FileOutputStream(temp);
                 byte[] buffer = new byte[BUFFER_SIZE];
                 int readBytes;
+                int readTotalBytes = 0;
                 while((readBytes = inputStream.read(buffer)) > 0){
+                    readTotalBytes += readBytes;
+                    if (Math.sqrt(readTotalBytes) == 1024){
+                        videoUploadVo.getUploadByteSize().getAndAdd(readTotalBytes);
+                        uploadScheduleMap.put(id, videoUploadVo);
+                        readTotalBytes = 0;
+                    }
                     outputStream.write(buffer , 0 , readBytes);
                 }
-                videoUploadVo.setSuccess(atomicInteger.getAndIncrement());
+                videoUploadVo.getUploadByteSize().getAndAdd(readTotalBytes);
+                videoUploadVo.setSuccess(successCount.incrementAndGet());
             }catch (Exception e){
                 logger.error("video upload thread failed ", e);
                 failedVos.add(VideoUploadVoUtil.buildErrorMessage(fileName, e.getMessage()));
-            }finally {
-                if (Objects.nonNull(outputStream)){
-                    outputStream.close();
-                }
-                if (Objects.nonNull(inputStream)){
-                    inputStream.close();
-                }
                 videoUploadVo.setFailedVos(failedVos);
                 videoUploadVo.setFailed(failedVos.size());
+            }finally {
                 uploadScheduleMap.put(id, videoUploadVo);
             }
         }

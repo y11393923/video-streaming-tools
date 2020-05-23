@@ -1,5 +1,6 @@
 package com.sensetime.tsc.streaming.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.sensetime.tsc.streaming.config.InitializeConfiguration;
 import com.sensetime.tsc.streaming.enums.CommonCodeEnum;
@@ -20,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.sensetime.tsc.streaming.constant.CommandConstant.*;
@@ -33,6 +35,7 @@ import static com.sensetime.tsc.streaming.enums.CommonCodeEnum.*;
  */
 @Service
 public class VideoServiceImpl implements VideoService {
+    private final Logger logger = LoggerFactory.getLogger(VideoServiceImpl.class);
 
     @Autowired
     private ExecCommandUtil execCommandUtil;
@@ -72,8 +75,33 @@ public class VideoServiceImpl implements VideoService {
                     ShellUtil.exec(SH_COMMAND, String.format(RM_COMMAND, newFileName));
                 }
             }
-            file.transferTo(newFile);
-            return VideoUploadVo.builder().success(1).build();
+            VideoUploadVo uploadVo = VideoUploadVo.builder().totalCount(1).totalByteSize(file.getSize()).build();
+            zipUtil.put(id, uploadVo);
+            configuration.getThreadPoolExecutor().execute(() -> {
+                try (InputStream inputStream = file.getInputStream();
+                     OutputStream outputStream = new FileOutputStream(newFile)){
+                    byte[] buffer = new byte[BUFFER_SIZE];
+                    int readBytes;
+                    long readTotalSize = 0;
+                    while((readBytes = inputStream.read(buffer)) > 0){
+                        readTotalSize += readBytes;
+                        if ((readTotalSize / 1024) % 1024 == 0){
+                            uploadVo.getUploadByteSize().getAndAdd((int) readTotalSize);
+                            zipUtil.put(id, uploadVo);
+                        }
+                        outputStream.write(buffer , 0 , readBytes);
+                    }
+                    uploadVo.setSuccess(1);
+                    uploadVo.getUploadByteSize().set((int) readTotalSize);
+                }catch (Exception e){
+                    logger.error("upload video failed", e);
+                    uploadVo.setFailed(1);
+                    uploadVo.getUploadByteSize().set(uploadVo.getTotalByteSize().intValue());
+                }finally {
+                    zipUtil.put(id, uploadVo);
+                }
+            });
+            return uploadVo;
         }else if (VIDEO_UPLOAD_TYPE_TWO.equals(type)){
             String zipUploadPath = videoStoragePath + UUID.randomUUID().toString() + FILE_SEPARATOR;
             File zipFilePath = new File(zipUploadPath);
