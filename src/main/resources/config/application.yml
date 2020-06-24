@@ -27,9 +27,11 @@ spring:
       resolve-lazily: false
 rtsp:
   #rtsp端口
-  port: 8890
+  port: 3033
   #需要转换rtsp流的视频源地址
   video-path:
 pool:
   #视频上传线程池大小
   corePoolSize:
+ffserver:
+  enabled: true

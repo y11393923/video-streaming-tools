@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * @author zhouyuyang_vendor
+ * @author zhouyuyang
  */
 @RestController
 @RequestMapping("/rtsp-server")

@@ -71,7 +71,7 @@ public class ZipUtil {
         zip.setProject(proj);
         zip.setDestFile(new File(zipFilepath));
         zip.addFileset(fileSet);
-        zip.setEncoding(ZIP_ENCODING);
+        zip.setEncoding(CHARSET_GBK);
         zip.execute();
 
         logger.info("compress success.");
@@ -93,7 +93,7 @@ public class ZipUtil {
         expand.setProject(project);
         expand.setTaskType("unzip");
         expand.setTaskName("unzip");
-        expand.setEncoding(ZIP_ENCODING);
+        expand.setEncoding(CHARSET_GBK);
 
         expand.setSrc(new File(zipFilepath));
         expand.setDest(new File(destDir));
@@ -211,7 +211,7 @@ public class ZipUtil {
                 int readTotalBytes = 0;
                 while((readBytes = inputStream.read(buffer)) > 0){
                     readTotalBytes += readBytes;
-                    if (Math.sqrt(readTotalBytes) == 1024){
+                    if ((readTotalBytes / 1024) % 1024 == 0){
                         videoUploadVo.getUploadByteSize().getAndAdd(readTotalBytes);
                         uploadScheduleMap.put(id, videoUploadVo);
                         readTotalBytes = 0;

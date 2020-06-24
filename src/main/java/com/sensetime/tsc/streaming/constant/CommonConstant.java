@@ -31,9 +31,15 @@ public class CommonConstant {
 
     public static final String SUFFIX_ZIP = "zip";
 
-    public static final String ZIP_ENCODING = "GBK";
+    public static final String CHARSET_UTF8 = "UTF-8";
+
+    public static final String CHARSET_GBK = "GBK";
+
+    public static final String RTSP_PORT_NAME = "RTSPPort";
 
     public static final Integer BUFFER_SIZE = 4096;
+
+    public static final String STREAM_NAME = "<Stream";
 
     public static final Integer MAP_MAX_SIZE = 16;
 

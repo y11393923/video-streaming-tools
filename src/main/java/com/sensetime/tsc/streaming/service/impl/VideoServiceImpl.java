@@ -1,6 +1,5 @@
 package com.sensetime.tsc.streaming.service.impl;
 
-import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.sensetime.tsc.streaming.config.InitializeConfiguration;
 import com.sensetime.tsc.streaming.enums.CommonCodeEnum;
@@ -8,8 +7,6 @@ import com.sensetime.tsc.streaming.response.VideoStreamInfo;
 import com.sensetime.tsc.streaming.response.VideoUploadVo;
 import com.sensetime.tsc.streaming.service.VideoService;
 import com.sensetime.tsc.streaming.utils.*;
-import org.apache.tools.zip.ZipEntry;
-import org.apache.tools.zip.ZipFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.sensetime.tsc.streaming.constant.CommandConstant.*;
@@ -86,7 +81,7 @@ public class VideoServiceImpl implements VideoService {
                     while((readBytes = inputStream.read(buffer)) > 0){
                         readTotalSize += readBytes;
                         if ((readTotalSize / 1024) % 1024 == 0){
-                            uploadVo.getUploadByteSize().getAndAdd((int) readTotalSize);
+                            uploadVo.getUploadByteSize().set((int) readTotalSize);
                             zipUtil.put(id, uploadVo);
                         }
                         outputStream.write(buffer , 0 , readBytes);

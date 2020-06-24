@@ -8,10 +8,33 @@ import org.springframework.util.StringUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+import static com.sensetime.tsc.streaming.constant.CommandConstant.*;
 
 public class ShellUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(ShellUtil.class);
+
+    private static final Pattern PATTERN = Pattern.compile("[0-9]*");
+
+    /**
+     * 脚本授权
+     * @param serverPath
+     * @throws Exception
+     */
+    public static void authorize(String serverPath) throws Exception {
+        String result = ShellUtil.exec(SH_COMMAND, String.format(QUERY_FILE_PERMISSIONS_CMD, serverPath));
+        if (Objects.nonNull(result)){
+            if (!PATTERN.matcher(result).matches()){
+                throw new Exception("init server authority error: "+ result);
+            }
+            if (Integer.parseInt(result.trim()) != FILE_PERMISSIONS){
+                ShellUtil.exec(SH_COMMAND, String.format(MODIFY_FILE_PERMISSIONS_CMD, serverPath));
+            }
+        }
+    }
 
 
     public static String exec(String... cmd) throws IOException {

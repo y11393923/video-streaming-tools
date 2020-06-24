@@ -14,7 +14,15 @@ public class CommandConstant {
 
     private static final String RTSP_SERVER_NAME = "component/rtsp-server";
 
+    private static final String FFSERVER_NAME = "component/ffserver";
+
+    private static final String FFSERVER_CONFIG_NAME = "component/ffserver.cfg";
+
     public static final String RTSP_SERVER_PATH = USER_DIR + FILE_SEPARATOR + RTSP_SERVER_NAME;
+
+    public static final String FFSERVER_PATH = USER_DIR + FILE_SEPARATOR + FFSERVER_NAME;
+
+    public static final String FFSERVER_CONFIG_PATH = USER_DIR + FILE_SEPARATOR + FFSERVER_CONFIG_NAME;
 
     private static final String FFMPEG_NAME = "component/ffmpeg";
 
@@ -45,5 +53,13 @@ public class CommandConstant {
     public static final String MV_COMMAND = "mv %s %s";
 
     public static final String RM_COMMAND = "rm -rf %s";
+
+    public static final String NEW_LINE = System.getProperty("line.separator");
+
+    public static final String STREAM_TEMPLATE = "<Stream %s>" + NEW_LINE + "File \"%s\"" + NEW_LINE + "Format rtp" + NEW_LINE + "</Stream>";
+
+    public static final String GET_FFSERVER_PROCESS_CMD = "ps -ef | grep ffserver | grep -v grep | grep ffserver.cfg | awk '{print $2}'";
+
+    public static final String START_FFSERVER_CMD = "nohup %s -f %s >cmd.log 2>&1 & ";
 
 }

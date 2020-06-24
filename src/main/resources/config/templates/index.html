@@ -101,6 +101,7 @@
             $(".upload").click(function () {
                 var thisObj = $(this);
                 $(".result").html("");
+                $(".schedule").html("");
                 var file = $(".file").val();
                 if (file === ""){
                     alert("请选择上传的文件");
@@ -141,7 +142,7 @@
                     contentType: false,
                     success: function (result) {
                         if(result.errorCode === "0"){
-                            interval = setInterval(schedule, 500);
+                            interval = setInterval(schedule, 100);
                         }else{
                             alert("上传失败:" + result.errorMsg)
                             thisObj.attr("disabled", false);
@@ -160,13 +161,14 @@
                     contentType: false,
                     success: function (result) {
                         if(result.errorCode === "0"){
-                            $(".result").html("");
                             let data = result.data;
-                            let num = ((data.uploadByteSize / data.totalByteSize) * 100).toFixed(1);
+                            if (data === undefined){
+                                return;
+                            }
+                            $(".result").html("");
+                            let num = ((data.uploadByteSize / data.totalByteSize) * 100).toFixed(0);
                             $(".schedule").html("上传进度： "+ num + "%");
-
-                            let count = data.success + data.failed;
-                            if (count === data.totalCount){
+                            if ((data.success + data.failed) === data.totalCount){
                                 if (data.success !== undefined){
                                     var success = "<p style='color: green'>成功上传" + data.success + "个视频</p>";
                                     $(".result").append(success);
@@ -186,6 +188,7 @@
                             $(".result").html("");
                             $(".schedule").html('');
                             console.log("获取上传进度失败")
+                            clearInterval(interval);
                         }
                     }
                 })
